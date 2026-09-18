@@ -44,7 +44,7 @@ def main():
     ap.add_argument("--widen", type=float, default=1.5)
     ap.add_argument("--half-life", type=float, default=240.0)
     ap.add_argument("--prior-sd", type=float, default=0.40)
-    ap.add_argument("--out", default="web/data.json")
+    ap.add_argument("--out", default="docs/data.json")
     a = ap.parse_args()
 
     matches, _ = load_matches(2019, CURRENT_START, divisions=("E0", "E1"))
