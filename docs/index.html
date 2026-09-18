@@ -113,6 +113,38 @@ section:first-of-type{border-top:none}
 .axis{position:relative; height:20px; margin-top:.6rem; border-top:1px solid var(--line-soft)}
 .axis span{position:absolute; top:4px; font-size:.75rem; color:var(--dim); transform:translateX(-50%)}
 
+/* ---------- head to head ---------- */
+.pick{display:grid; grid-template-columns:1fr auto 1fr; gap:1rem; align-items:end; max-width:720px; margin-bottom:2.6rem}
+.pick label{display:block; font-size:.8125rem; color:var(--dim); margin-bottom:.45rem}
+.pick select{
+  width:100%; font-family:inherit; font-size:1rem; color:var(--chalk); background:var(--panel);
+  border:1px solid var(--line); border-radius:2px; padding:.6rem .7rem; appearance:none; cursor:pointer;
+}
+.pick select:hover{border-color:var(--dim)}
+#swap{
+  font-family:inherit; font-size:1rem; color:var(--dim); background:none; border:1px solid var(--line);
+  border-radius:2px; padding:.6rem .8rem; cursor:pointer; line-height:1;
+}
+#swap:hover{color:var(--flood); border-color:var(--flood)}
+.h2h{display:grid; grid-template-columns:1fr 340px; gap:clamp(28px,5vw,56px); align-items:start}
+.odds{display:flex; height:46px; border-radius:2px; overflow:hidden; margin-bottom:.7rem}
+.odds div{display:flex; align-items:center; justify-content:center; font-weight:600; font-size:.9375rem;
+  color:var(--night); transition:flex-grow .45s cubic-bezier(.4,0,.2,1)}
+.odds .h{background:var(--flood)} .odds .d{background:#4E6B84; color:var(--chalk)} .odds .a{background:#8FA3B8}
+.okeys{display:flex; justify-content:space-between; font-size:.8125rem; color:var(--dim); margin-bottom:2rem}
+.stats{display:grid; grid-template-columns:repeat(2,1fr); gap:1.4rem 2rem; margin-bottom:2rem}
+.stat .n{font-size:1.5rem; font-weight:600; letter-spacing:-0.02em}
+.stat .l{font-size:.8125rem; color:var(--dim); margin-top:.15rem}
+.scores{display:grid; gap:.4rem}
+.sc{display:grid; grid-template-columns:3.4rem 1fr 3rem; align-items:center; gap:.7rem; font-size:.875rem}
+.sc .t{height:10px; background:var(--panel); border-radius:1px; overflow:hidden}
+.sc .f{height:100%; background:var(--flood)}
+.sc .p{color:var(--dim); text-align:right; font-size:.8125rem}
+.grid-wrap h3{font-size:1.0625rem; margin-bottom:.9rem}
+.mx{width:100%; display:block}
+.mx text{font-family:'Archivo',sans-serif; font-size:10.5px; fill:var(--dim)}
+.mx .ax{font-size:11px; fill:var(--dim)}
+
 /* ---------- finishing ---------- */
 .fin{display:grid; gap:4px; max-width:780px}
 .frow{display:grid; grid-template-columns:minmax(80px,120px) 1fr; align-items:center; gap:1rem}
@@ -141,6 +173,8 @@ footer p+p{margin-top:.7rem}
 
 @media (max-width:860px){
   .two{grid-template-columns:1fr}
+  .h2h{grid-template-columns:1fr}
+  .pick{grid-template-columns:1fr auto 1fr; gap:.6rem}
   .hm-scroll{display:none}
   .hm-mobile{display:block}
   .rrow{grid-template-columns:minmax(72px,96px) 1fr}
@@ -193,6 +227,33 @@ footer p+p{margin-top:.7rem}
     <p class="serif lede">The lines matter more than the dots. Where two clubs' lines overlap heavily, the model is telling you it cannot separate them, whatever their order here suggests.</p>
     <div class="ranges" id="ranges"></div>
     <div class="axis" id="axis"></div>
+  </section>
+
+  <section id="match">
+    <div class="head">
+      <h2>Any fixture</h2>
+      <p class="note">Pick two clubs</p>
+    </div>
+    <p class="serif lede">The model never names a winner. It gives the chance of each result, which is a different and more useful thing: a club can be the likeliest winner and still lose more often than not.</p>
+    <div class="pick">
+      <div><label for="home">At home</label><select id="home"></select></div>
+      <button id="swap" type="button" title="Swap home and away">&#8646;</button>
+      <div><label for="away">Away</label><select id="away"></select></div>
+    </div>
+    <div class="h2h">
+      <div>
+        <div class="odds" id="odds"><div class="h"></div><div class="d"></div><div class="a"></div></div>
+        <div class="okeys" id="okeys"></div>
+        <div class="stats" id="mstats"></div>
+        <h3 style="font-size:1.0625rem;margin-bottom:.9rem">Most likely scores</h3>
+        <div class="scores" id="scores"></div>
+      </div>
+      <div class="grid-wrap">
+        <h3>Every scoreline</h3>
+        <svg class="mx" id="mx" aria-label="Probability of each scoreline"></svg>
+        <p class="serif" style="font-size:.9375rem;margin-top:1rem" id="mxnote"></p>
+      </div>
+    </div>
   </section>
 
   <section id="finishing">
@@ -449,6 +510,10 @@ function build(d){
     Array.from({length:count},(_,i)=>{const v=first+i*10;
       return `<span style="left:${pct(v)}%">${v}</span>`}).join('') + `</div>`;
 
+  /* ---- head to head ---- */
+  if(d.ratings && d.ratings.clubs){ h2h(d.ratings); }
+  else{ document.getElementById('match').style.display='none'; }
+
   /* ---- finishing ---- */
   const F=d.finishing, fm=Math.max(...F.map(f=>Math.abs(f.diff)));
   document.getElementById('fin').innerHTML = F.map(f=>{
@@ -493,6 +558,103 @@ function build(d){
   });
   const lbl=el('text',{x:xs(d.meta.widen)+10,y:ys(79.3)-10,fill:C.flood});
   lbl.textContent='used here'; cal.appendChild(lbl);
+}
+
+/* ---- the model, in the browser ---- */
+const MAXG=12, lgamma=(()=>{const c=[76.18009173,-86.50532033,24.01409822,-1.231739516,.00120858003,-5.36382e-6];
+  return x=>{let y=x,t=x+5.5; t-=(x+.5)*Math.log(t); let s=1.000000000190015;
+    for(let j=0;j<6;j++) s+=c[j]/++y; return -t+Math.log(2.5066282746310005*s/x)};})();
+
+function scoreMatrix(lam,mu,rho){
+  const ph=[],pa=[];
+  for(let k=0;k<=MAXG;k++){
+    ph.push(Math.exp(k*Math.log(lam)-lam-lgamma(k+1)));
+    pa.push(Math.exp(k*Math.log(mu)-mu-lgamma(k+1)));
+  }
+  const M=ph.map(a=>pa.map(b=>a*b));
+  M[0][0]*=1-lam*mu*rho; M[0][1]*=1+lam*rho; M[1][0]*=1+mu*rho; M[1][1]*=1-rho;
+  let tot=0; for(const r of M) for(const v of r) tot+=Math.max(v,0);
+  return M.map(r=>r.map(v=>Math.max(v,0)/tot));
+}
+
+function h2h(R){
+  const clubs=[...R.clubs].sort((a,b)=>a.team.localeCompare(b.team));
+  const homeSel=document.getElementById('home'), awaySel=document.getElementById('away');
+  clubs.forEach(c=>{
+    homeSel.appendChild(new Option(c.team,c.team));
+    awaySel.appendChild(new Option(c.team,c.team));
+  });
+  const byTeam=Object.fromEntries(clubs.map(c=>[c.team,c]));
+  homeSel.value='Arsenal'; awaySel.value='Manchester City';
+
+  function draw(){
+    const H=byTeam[homeSel.value], A=byTeam[awaySel.value];
+    if(!H||!A||H.team===A.team){ return; }
+    const lam=Math.exp(R.intercept+R.home_adv+H.attack-A.defence);
+    const mu =Math.exp(R.intercept+A.attack-H.defence);
+    const M=scoreMatrix(lam,mu,R.rho);
+
+    let pw=0,pd=0,pa=0,ov=0,btts=0;
+    const flat=[];
+    for(let i=0;i<=MAXG;i++)for(let j=0;j<=MAXG;j++){
+      const v=M[i][j];
+      if(i>j)pw+=v; else if(i===j)pd+=v; else pa+=v;
+      if(i+j>2.5)ov+=v;
+      if(i>0&&j>0)btts+=v;
+      flat.push([i,j,v]);
+    }
+    const o=document.getElementById('odds').children;
+    o[0].style.flexGrow=pw; o[1].style.flexGrow=pd; o[2].style.flexGrow=pa;
+    o[0].textContent=pw>.1?(pw*100).toFixed(0)+'%':'';
+    o[1].textContent=pd>.1?(pd*100).toFixed(0)+'%':'';
+    o[2].textContent=pa>.1?(pa*100).toFixed(0)+'%':'';
+    document.getElementById('okeys').innerHTML=
+      `<span>${H.short} win</span><span>Draw</span><span>${A.short} win</span>`;
+
+    document.getElementById('mstats').innerHTML=[
+      [lam.toFixed(2)+' – '+mu.toFixed(2),'Goals expected'],
+      [(ov*100).toFixed(0)+'%','Three or more goals'],
+      [(btts*100).toFixed(0)+'%','Both clubs score'],
+      [(pd*100).toFixed(0)+'%','Draw'],
+    ].map(([n,l])=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+
+    flat.sort((a,b)=>b[2]-a[2]);
+    const top=flat.slice(0,6), mx=top[0][2];
+    document.getElementById('scores').innerHTML=top.map(([i,j,v])=>
+      `<div class="sc"><span>${i}&ndash;${j}</span>
+        <div class="t"><div class="f" style="width:${(v/mx*100).toFixed(1)}%"></div></div>
+        <span class="p">${(v*100).toFixed(1)}%</span></div>`).join('');
+
+    // full scoreline grid, 0-6 each way
+    const G=6, SV=document.getElementById('mx'), CS=40, PAD=26;
+    SV.innerHTML=''; SV.setAttribute('viewBox',`0 0 ${PAD+(G+1)*CS} ${PAD+(G+1)*CS+8}`);
+    const peak=Math.max(...M.slice(0,G+1).flatMap(r=>r.slice(0,G+1)));
+    for(let j=0;j<=G;j++){
+      const t=el('text',{x:PAD+j*CS+CS/2,y:16,'text-anchor':'middle',class:'ax'});
+      t.textContent=j; SV.appendChild(t);
+    }
+    for(let i=0;i<=G;i++){
+      const t=el('text',{x:PAD-8,y:PAD+i*CS+CS/2+4,'text-anchor':'end',class:'ax'});
+      t.textContent=i; SV.appendChild(t);
+      for(let j=0;j<=G;j++){
+        const v=M[i][j];
+        SV.appendChild(el('rect',{x:PAD+j*CS,y:PAD+i*CS,width:CS-2,height:CS-2,rx:1,
+          fill:scale(Math.sqrt(v/peak))}));
+        if(v>peak*0.18){
+          const t2=el('text',{x:PAD+j*CS+CS/2-1,y:PAD+i*CS+CS/2+4,'text-anchor':'middle',
+            fill:v>peak*0.55?C.night:C.chalk});
+          t2.textContent=(v*100).toFixed(0); SV.appendChild(t2);
+        }
+      }
+    }
+    document.getElementById('mxnote').textContent =
+      `Rows are ${H.short} goals, columns ${A.short}. Numbers are percentages; the diagonal is a draw.`;
+  }
+  homeSel.onchange=awaySel.onchange=draw;
+  document.getElementById('swap').onclick=()=>{
+    const h=homeSel.value; homeSel.value=awaySel.value; awaySel.value=h; draw();
+  };
+  draw();
 }
 </script>
 </body>
