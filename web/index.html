@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Premier League 2026-27 — projected</title>
+<meta name="description" content="A statistical projection of the 2026-27 Premier League season, and an honest account of how it was built.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#0D1B2A; --deep:#16293D; --panel:#122336; --line:#274866; --line-soft:#1E3B56;
+  --chalk:#E8EDF2; --dim:#8FA3B8;
+  --flood:#FFD166; --turf:#4EA76A; --clay:#D9483C;
+  --measure:64ch;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--night); color:var(--chalk);
+  font-family:'Archivo',system-ui,sans-serif;
+  font-variant-numeric:tabular-nums lining-nums;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0; font-weight:600; letter-spacing:-0.02em; line-height:1.05}
+p{margin:0}
+.serif{font-family:'Source Serif 4',Georgia,serif; line-height:1.55; font-size:1.0625rem; color:#C3D0DC}
+.serif b{color:var(--chalk); font-weight:600}
+a{color:var(--flood); text-decoration:none; border-bottom:1px solid rgba(255,209,102,.35)}
+a:hover{border-bottom-color:var(--flood)}
+:focus-visible{outline:2px solid var(--flood); outline-offset:3px}
+
+/* ---------- intro ---------- */
+#intro{position:fixed; inset:0; z-index:100; background:var(--night); transition:opacity .9s ease}
+#intro.done{opacity:0; pointer-events:none}
+#intro canvas{display:block; width:100%; height:100%}
+#skip{
+  position:absolute; right:clamp(16px,4vw,40px); bottom:clamp(16px,4vw,40px);
+  color:var(--dim); font-size:.8125rem; background:none; border:1px solid var(--line);
+  padding:.5rem .9rem; border-radius:2px; cursor:pointer; opacity:0;
+  transition:opacity .5s ease,color .2s,border-color .2s; font-family:inherit;
+}
+#skip.show{opacity:1}
+#skip:hover{color:var(--chalk); border-color:var(--dim)}
+#scoreline{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  font-size:clamp(2.5rem,9vw,6rem); font-weight:700; letter-spacing:-0.04em;
+  opacity:0; transition:opacity .35s ease; pointer-events:none; color:var(--flood);
+}
+#scoreline.show{opacity:1}
+
+/* ---------- shell ---------- */
+#page{opacity:0; transition:opacity .8s ease .25s}
+#page.in{opacity:1}
+.wrap{max-width:1180px; margin:0 auto; padding:0 clamp(18px,4vw,44px)}
+section{padding-block:clamp(56px,9vh,104px); border-top:1px solid var(--line-soft)}
+section:first-of-type{border-top:none}
+
+/* ---------- masthead ---------- */
+.mast{padding-block:clamp(44px,10vh,92px) clamp(28px,5vh,48px)}
+.mast h1{font-size:clamp(2.6rem,7.5vw,5.5rem); line-height:.95; letter-spacing:-0.045em}
+.mast h1 span{display:block; color:var(--dim)}
+.mast .sub{margin-top:1.4rem; max-width:var(--measure)}
+.facts{display:flex; flex-wrap:wrap; gap:2rem 3rem; margin-top:2.2rem;
+  padding-top:1.4rem; border-top:1px solid var(--line-soft)}
+.fact .n{font-size:1.55rem; font-weight:600; letter-spacing:-0.02em}
+.fact .l{font-size:.8125rem; color:var(--dim); margin-top:.2rem}
+
+.head{display:flex; flex-wrap:wrap; align-items:baseline; gap:.9rem 1.5rem; margin-bottom:.5rem}
+.head h2{font-size:clamp(1.5rem,3.2vw,2.15rem)}
+.head .note{font-size:.875rem; color:var(--dim)}
+.lede{max-width:var(--measure); margin-bottom:2.4rem}
+
+/* ---------- heatmap ---------- */
+.hm-scroll{overflow-x:auto; margin-inline:calc(-1*clamp(18px,4vw,44px)); padding-inline:clamp(18px,4vw,44px)}
+.hm{width:100%; min-width:760px; display:block}
+.hm text{font-family:'Archivo',sans-serif; font-size:11px; fill:var(--dim)}
+.hm .club{font-size:12.5px; fill:var(--chalk); text-anchor:end}
+.hm rect{shape-rendering:crispEdges}
+.hm .cell:hover{stroke:var(--chalk); stroke-width:1.5}
+.hm .zone{fill:none; stroke:var(--line); stroke-dasharray:3 3}
+.legend{display:flex; align-items:center; gap:.7rem; margin-top:1.2rem; font-size:.8125rem; color:var(--dim)}
+.legend .ramp{width:180px; height:9px; border-radius:1px}
+
+/* mobile single-club view */
+.hm-mobile{display:none}
+.picker{display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem}
+.picker button{
+  font-family:inherit; font-size:.8125rem; color:var(--dim); background:var(--panel);
+  border:1px solid var(--line-soft); border-radius:2px; padding:.4rem .7rem; cursor:pointer;
+}
+.picker button[aria-pressed="true"]{color:var(--night); background:var(--flood); border-color:var(--flood); font-weight:600}
+.bars{display:grid; gap:3px}
+.bar-row{display:grid; grid-template-columns:2.2rem 1fr 3rem; align-items:center; gap:.6rem; font-size:.8125rem}
+.bar-row .track{height:14px; background:var(--panel); border-radius:1px; overflow:hidden}
+.bar-row .fill{height:100%; background:var(--flood)}
+.bar-row .pc{color:var(--dim); text-align:right}
+
+/* ---------- ranges ---------- */
+.ranges{display:grid; gap:2px}
+.rrow{display:grid; grid-template-columns:minmax(88px,140px) 1fr; align-items:center;
+  gap:1rem; padding:.3rem 0; border-radius:2px}
+.rrow:hover{background:var(--panel)}
+.rrow .name{font-size:.9375rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.rrow .track{position:relative; height:22px}
+.rrow .span{position:absolute; top:10px; height:2px; background:var(--line)}
+.rrow .dot{position:absolute; top:5px; width:12px; height:12px; margin-left:-6px;
+  border-radius:50%; background:var(--flood)}
+.rrow .lo,.rrow .hi{position:absolute; top:4px; font-size:.75rem; color:var(--dim)}
+.rrow .lo{transform:translateX(calc(-100% - 8px))}
+.rrow .hi{margin-left:8px}
+.axis{position:relative; height:20px; margin-top:.6rem; border-top:1px solid var(--line-soft)}
+.axis span{position:absolute; top:4px; font-size:.75rem; color:var(--dim); transform:translateX(-50%)}
+
+/* ---------- finishing ---------- */
+.fin{display:grid; gap:4px; max-width:780px}
+.frow{display:grid; grid-template-columns:minmax(80px,120px) 1fr; align-items:center; gap:1rem}
+.frow .name{font-size:.9375rem; text-align:right; color:var(--dim)}
+.frow .t{position:relative; height:20px}
+.frow .mid{position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line)}
+.frow .b{position:absolute; top:4px; height:12px; border-radius:1px}
+.frow .v{position:absolute; top:2px; font-size:.75rem; color:var(--dim)}
+
+/* ---------- evidence ---------- */
+.two{display:grid; grid-template-columns:1fr 1fr; gap:clamp(28px,5vw,64px); align-items:start}
+table{width:100%; border-collapse:collapse; font-size:.9375rem}
+th,td{text-align:right; padding:.55rem .4rem; border-bottom:1px solid var(--line-soft)}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500; color:var(--dim); font-size:.8125rem}
+td.best{color:var(--flood); font-weight:600}
+.cal{width:100%; height:230px; display:block; margin-top:.5rem}
+.cal text{font-family:'Archivo',sans-serif; font-size:11px; fill:var(--dim)}
+
+.callout{border-left:2px solid var(--flood); padding:.2rem 0 .2rem 1.2rem; margin-top:2rem; max-width:var(--measure)}
+
+footer{padding-block:clamp(40px,7vh,72px); border-top:1px solid var(--line-soft); color:var(--dim); font-size:.875rem}
+footer p+p{margin-top:.7rem}
+.banner{background:var(--panel); border:1px solid var(--line); border-radius:2px;
+  padding:.8rem 1rem; font-size:.875rem; color:var(--dim); margin-bottom:2rem}
+
+@media (max-width:860px){
+  .two{grid-template-columns:1fr}
+  .hm-scroll{display:none}
+  .hm-mobile{display:block}
+  .rrow{grid-template-columns:minmax(72px,96px) 1fr}
+  .rrow .lo,.rrow .hi{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important; transition-duration:.01ms!important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<div id="intro" role="presentation">
+  <canvas id="c"></canvas>
+  <div id="scoreline">1 – 0</div>
+  <button id="skip" type="button">Skip</button>
+</div>
+
+<div id="page">
+<div class="wrap">
+
+  <header class="mast">
+    <h1>Twenty clubs.<span>Thirty-four matchweeks left.</span></h1>
+    <p class="serif sub">A statistical model reads seven seasons of results and shot quality, works out how good every club really is, then plays the rest of this season out twenty thousand times. Here is what it found, and here is what it gets wrong.</p>
+    <div class="facts" id="facts"></div>
+  </header>
+
+  <div id="banner"></div>
+
+  <section id="positions">
+    <div class="head">
+      <h2>Where every club finishes</h2>
+      <p class="note">Brighter means more likely</p>
+    </div>
+    <p class="serif lede">Most tables give you one predicted position per club. That hides the truth, which is that almost every club has a wide range of plausible finishes. Each row below is one club's entire distribution across twenty thousand simulated seasons.</p>
+    <div class="hm-scroll"><svg class="hm" id="hm" aria-label="Probability of each finishing position for every club"></svg></div>
+    <div class="legend"><span>Less likely</span><div class="ramp" id="ramp"></div><span>More likely</span></div>
+    <div class="hm-mobile">
+      <div class="picker" id="picker"></div>
+      <div class="bars" id="bars"></div>
+    </div>
+  </section>
+
+  <section id="points">
+    <div class="head">
+      <h2>Projected points</h2>
+      <p class="note">Dot is the average, line covers the middle 80% of outcomes</p>
+    </div>
+    <p class="serif lede">The lines matter more than the dots. Where two clubs' lines overlap heavily, the model is telling you it cannot separate them, whatever their order here suggests.</p>
+    <div class="ranges" id="ranges"></div>
+    <div class="axis" id="axis"></div>
+  </section>
+
+  <section id="finishing">
+    <div class="head">
+      <h2>Finishing, over seven seasons</h2>
+      <p class="note">Goals scored minus goals expected</p>
+    </div>
+    <p class="serif lede">Expected goals counts the quality of chances a club creates. Score more than that and you are finishing well, or riding luck; the model treats it as a mix of both, which is why it fits on a blend of goals and expected goals rather than either alone.</p>
+    <div class="fin" id="fin"></div>
+  </section>
+
+  <section id="evidence">
+    <div class="head"><h2>Does it actually work</h2></div>
+    <p class="serif lede">Every number above is worthless without this part. The model is tested by walking through past seasons week by week, fitting only on what was known at the time, predicting the next round, and scoring it against what happened.</p>
+    <div class="two">
+      <div>
+        <h3 style="font-size:1.0625rem;margin-bottom:.8rem">Prediction error, lower is better</h3>
+        <table id="bt"></table>
+        <p class="serif" style="font-size:.9375rem;margin-top:1rem">Fitting on expected goals beat fitting on goals in all three seasons. The bookmaker's closing price beat both, every time, by about the same margin. That is not a flaw so much as a fact about betting markets, and it is why this site has no odds on it.</p>
+      </div>
+      <div>
+        <h3 style="font-size:1.0625rem;margin-bottom:.8rem">How often reality landed inside the range</h3>
+        <svg class="cal" id="cal" aria-label="Coverage against widening factor"></svg>
+        <p class="serif" style="font-size:.9375rem;margin-top:1rem">Standing at matchweek four across seven seasons, only 68.6% of clubs finished inside a band meant to hold 80%. The projections were confidently too narrow. Stretching the spread by 1.5 fixes the number.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <p class="serif"><b>We do not know why 1.5.</b> Two explanations were tested and both failed. Letting club strength drift over the season needed a magnitude three times the entire gap between the best and worst clubs in the league, which is not a description of football. Loosening the model's shrinkage moved the number the wrong way. The remaining suspect is the resampling method used to estimate how uncertain the ratings are, and that is untested. So the correction stands, calibrated against seven seasons of history, with no mechanism behind it. Every projection here carries that caveat.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Results and odds from football-data.co.uk. Expected goals from Understat. Neither is affiliated with this project.</p>
+    <p>The model is a Dixon-Coles bivariate Poisson fitted by weighted maximum likelihood across the Premier League and the Championship together, so promoted clubs carry a real prior instead of a guess.</p>
+    <p id="stamp"></p>
+  </footer>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================ intro ============================ */
+(function(){
+  const intro=document.getElementById('intro'), skip=document.getElementById('skip'),
+        score=document.getElementById('scoreline'), page=document.getElementById('page');
+  const reduced=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let seen=false; try{seen=sessionStorage.getItem('seen')==='1'}catch(e){}
+  const DUR = reduced?0 : (seen?900:2600);
+  let done=false, raf=null;
+
+  function finish(){
+    if(done) return; done=true;
+    if(raf) cancelAnimationFrame(raf);
+    intro.classList.add('done'); page.classList.add('in');
+    try{sessionStorage.setItem('seen','1')}catch(e){}
+    setTimeout(()=>{intro.style.display='none'},1000);
+  }
+  skip.addEventListener('click',finish);
+  addEventListener('keydown',e=>{if(!done)finish()},{once:true});
+  addEventListener('wheel',()=>{if(!done)finish()},{once:true,passive:true});
+
+  if(DUR===0 || typeof THREE==='undefined'){ finish(); return; }
+  setTimeout(()=>{ if(!done) skip.classList.add('show'); }, Math.min(700,DUR*0.35));
+
+  const cv=document.getElementById('c');
+  const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  const scene=new THREE.Scene();
+  scene.fog=new THREE.Fog(0x0D1B2A,26,78);
+  const cam=new THREE.PerspectiveCamera(42,1,0.1,200);
+
+  function resize(){
+    const w=innerWidth,h=innerHeight;
+    renderer.setSize(w,h,false); cam.aspect=w/h; cam.updateProjectionMatrix();
+  }
+  addEventListener('resize',resize);
+
+  // Stylised, not realistic: flat planes and thin frames, one warm key light.
+  const pitch=new THREE.Mesh(
+    new THREE.PlaneGeometry(64,96),
+    new THREE.MeshStandardMaterial({color:0x123021,roughness:1,metalness:0}));
+  pitch.rotation.x=-Math.PI/2; scene.add(pitch);
+
+  const chalk=new THREE.LineBasicMaterial({color:0x2E5C7A,transparent:true,opacity:.75});
+  function box(w,d,z){
+    const g=new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-w/2,.02,z-d),new THREE.Vector3(w/2,.02,z-d),
+      new THREE.Vector3(w/2,.02,z),new THREE.Vector3(-w/2,.02,z),new THREE.Vector3(-w/2,.02,z-d)]);
+    scene.add(new THREE.Line(g,chalk));
+  }
+  box(40,16,-32); box(18,6,-32); box(40,16,32+16-16);
+  const circ=new THREE.BufferGeometry().setFromPoints(
+    Array.from({length:65},(_,i)=>new THREE.Vector3(Math.cos(i/64*6.283)*9,.02,Math.sin(i/64*6.283)*9)));
+  scene.add(new THREE.Line(circ,chalk));
+  const halfway=new THREE.BufferGeometry().setFromPoints(
+    [new THREE.Vector3(-32,.02,0),new THREE.Vector3(32,.02,0)]);
+  scene.add(new THREE.Line(halfway,chalk));
+
+  // goal frame
+  const frame=new THREE.MeshStandardMaterial({color:0xE8EDF2,roughness:.35,metalness:.1});
+  const GW=14.6,GH=4.9;
+  [[-GW/2,GH/2],[GW/2,GH/2]].forEach(([x,y])=>{
+    const p=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,GH,10),frame);
+    p.position.set(x,y,-32); scene.add(p);
+  });
+  const bar=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,GW,10),frame);
+  bar.rotation.z=Math.PI/2; bar.position.set(0,GH,-32); scene.add(bar);
+
+  // net as a grid that can ripple
+  const NW=16,NH=8;
+  const netGeo=new THREE.PlaneGeometry(GW,GH,NW,NH);
+  const net=new THREE.Mesh(netGeo,new THREE.MeshBasicMaterial({
+    color:0x6E8CA6,wireframe:true,transparent:true,opacity:.5}));
+  net.position.set(0,GH/2,-33.6); scene.add(net);
+  const rest=netGeo.attributes.position.array.slice();
+
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(.42,20,14),
+    new THREE.MeshStandardMaterial({color:0xF2F5F8,roughness:.5}));
+  scene.add(ball);
+
+  scene.add(new THREE.AmbientLight(0x2A4560,1.1));
+  const key=new THREE.DirectionalLight(0xFFD9A0,1.5); key.position.set(-14,26,6); scene.add(key);
+  const rim=new THREE.PointLight(0x7FB2E0,90,60); rim.position.set(12,14,-22); scene.add(rim);
+
+  resize();
+  const t0=performance.now();
+  const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+
+  function frameLoop(now){
+    const t=Math.min((now-t0)/DUR,1);
+    // ball: from near the camera to the net, with an arc
+    const bt=Math.min(t/0.44,1), be=ease(bt);
+    ball.position.set(-2.2+2.2*be, .5+Math.sin(be*Math.PI)*3.4, 14-47.6*be);
+    ball.rotation.x-=.22; ball.rotation.y-=.05;
+
+    // net ripple on impact
+    const pos=netGeo.attributes.position;
+    if(bt>=1){
+      const since=(t-0.44)*DUR/1000, damp=Math.exp(-since*3.4);
+      for(let i=0;i<pos.count;i++){
+        const x=rest[i*3],y=rest[i*3+1];
+        const d=Math.hypot(x,y-0)/6;
+        pos.array[i*3+2]=rest[i*3+2]-Math.cos(Math.min(d*3.1,Math.PI/2))*Math.cos(since*13-d*5)*damp*1.5;
+      }
+      pos.needsUpdate=true;
+      if(!score.classList.contains('show')&&since>0.12) score.classList.add('show');
+      if(since>0.55) score.classList.remove('show');
+    }
+
+    // camera: behind the ball, then lifting to a plan view as the pitch flattens
+    const ct=Math.max(0,(t-0.42)/0.58), ce=ease(Math.min(ct,1));
+    cam.position.set(0, 3.2+38*ce, 20-24*ce);
+    cam.lookAt(0, 0, -32+30*ce);
+    scene.fog.near=26+40*ce;
+
+    renderer.render(scene,cam);
+    if(t<1) raf=requestAnimationFrame(frameLoop); else finish();
+  }
+  raf=requestAnimationFrame(frameLoop);
+})();
+
+/* ============================ dashboard ============================ */
+const C={night:'#0D1B2A',panel:'#122336',line:'#274866',chalk:'#E8EDF2',dim:'#8FA3B8',
+         flood:'#FFD166',turf:'#4EA76A',clay:'#D9483C'};
+
+function lerp(a,b,t){return a+(b-a)*t}
+function hex(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]}
+const S0=hex('#122336'), S1=hex('#2E6E8E'), S2=hex('#FFD166');
+function scale(t){ // 0..1 cool to warm, three stops
+  t=Math.max(0,Math.min(1,t));
+  const [a,b,u] = t<.5 ? [S0,S1,t/.5] : [S1,S2,(t-.5)/.5];
+  return `rgb(${Math.round(lerp(a[0],b[0],u))},${Math.round(lerp(a[1],b[1],u))},${Math.round(lerp(a[2],b[2],u))})`;
+}
+const el=(t,a={})=>{const n=document.createElementNS('http://www.w3.org/2000/svg',t);
+  for(const k in a)n.setAttribute(k,a[k]); return n};
+
+fetch('data.json').then(r=>r.json()).then(build).catch(()=>{
+  document.getElementById('banner').innerHTML =
+    '<div class="banner">Could not load data.json. Run <b>python export_web.py</b> to generate it, then reload.</div>';
+});
+
+function build(d){
+  document.getElementById('stamp').textContent =
+    `Season ${d.season}, after matchweek ${d.matchweek}. ${d.meta.sims.toLocaleString()} simulated seasons across ${d.meta.bootstrap} refits of the model, spread widened by ${d.meta.widen}. Generated ${d.generated}.`;
+
+  if(d.sample){
+    document.getElementById('banner').innerHTML =
+      '<div class="banner">Showing the projections produced on 14 September 2026. Run <b>python export_web.py</b> after each matchweek to refresh this file.</div>';
+  }
+
+  document.getElementById('facts').innerHTML = [
+    [d.meta.matches.toLocaleString(),'matches fitted'],
+    [d.meta.xg_matches.toLocaleString(),'with shot-quality data'],
+    [d.meta.sims.toLocaleString(),'seasons simulated'],
+    ['7','seasons of testing'],
+  ].map(([n,l])=>`<div class="fact"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+
+  /* ---- heatmap ---- */
+  const P=d.projections, n=P.length;
+  const LEFT=118, TOP=26, CW=(1180-LEFT-24)/20, CH=22;
+  const svg=document.getElementById('hm');
+  svg.setAttribute('viewBox',`0 0 1180 ${TOP+n*CH+14}`);
+  const peak=Math.max(...P.flatMap(p=>p.positions));
+  for(let c=0;c<20;c++){
+    const x=LEFT+c*CW+CW/2;
+    const lab=el('text',{x,y:16,'text-anchor':'middle'}); lab.textContent=c+1; svg.appendChild(lab);
+  }
+  P.forEach((p,r)=>{
+    const y=TOP+r*CH;
+    const name=el('text',{x:LEFT-12,y:y+15,class:'club'}); name.textContent=p.short; svg.appendChild(name);
+    p.positions.forEach((v,c)=>{
+      const cell=el('rect',{x:LEFT+c*CW,y,width:CW-1.5,height:CH-1.5,class:'cell',
+        fill:scale(Math.sqrt(v/peak)),rx:1});
+      const tip=el('title'); tip.textContent=`${p.team} finishes ${c+1}${['st','nd','rd'][c]||'th'}: ${(v*100).toFixed(1)}%`;
+      cell.appendChild(tip); svg.appendChild(cell);
+    });
+  });
+  // European places and the drop, marked as structure not decoration
+  [[0,5],[17,20]].forEach(([a,b])=>svg.appendChild(el('rect',{
+    x:LEFT+a*CW-1.5,y:TOP-4,width:(b-a)*CW,height:n*CH+6,class:'zone',rx:1})));
+  document.getElementById('ramp').style.background =
+    `linear-gradient(90deg,${scale(0)},${scale(.5)},${scale(1)})`;
+
+  /* ---- mobile single club ---- */
+  const picker=document.getElementById('picker'), bars=document.getElementById('bars');
+  function drawClub(i){
+    const p=P[i], mx=Math.max(...p.positions);
+    bars.innerHTML=p.positions.map((v,c)=>`<div class="bar-row"><span>${c+1}</span>
+      <div class="track"><div class="fill" style="width:${(v/mx*100).toFixed(1)}%"></div></div>
+      <span class="pc">${(v*100).toFixed(1)}%</span></div>`).join('');
+    [...picker.children].forEach((b,j)=>b.setAttribute('aria-pressed',j===i));
+  }
+  P.forEach((p,i)=>{
+    const b=document.createElement('button'); b.type='button'; b.textContent=p.short;
+    b.onclick=()=>drawClub(i); picker.appendChild(b);
+  });
+  drawClub(0);
+
+  /* ---- points ranges ---- */
+  const lo=Math.min(...P.map(p=>p.p10))-3, hi=Math.max(...P.map(p=>p.p90))+3;
+  const pct=v=>((v-lo)/(hi-lo)*100);
+  document.getElementById('ranges').innerHTML = P.map(p=>`
+    <div class="rrow"><div class="name">${p.short}</div>
+      <div class="track">
+        <div class="span" style="left:${pct(p.p10)}%;width:${pct(p.p90)-pct(p.p10)}%"></div>
+        <div class="lo" style="left:${pct(p.p10)}%">${p.p10}</div>
+        <div class="hi" style="left:${pct(p.p90)}%">${p.p90}</div>
+        <div class="dot" style="left:${pct(p.proj)}%" title="${p.team}: ${p.proj} points on average"></div>
+      </div></div>`).join('');
+  const first=Math.ceil(lo/10)*10, count=Math.floor((hi-first)/10)+1;
+  document.getElementById('axis').innerHTML =
+    `<div style="position:absolute;left:calc(140px + 1rem);right:0;top:0;height:100%">` +
+    Array.from({length:count},(_,i)=>{const v=first+i*10;
+      return `<span style="left:${pct(v)}%">${v}</span>`}).join('') + `</div>`;
+
+  /* ---- finishing ---- */
+  const F=d.finishing, fm=Math.max(...F.map(f=>Math.abs(f.diff)));
+  document.getElementById('fin').innerHTML = F.map(f=>{
+    const w=Math.abs(f.diff)/fm*48, pos=f.diff>=0;
+    return `<div class="frow"><div class="name">${f.short}</div>
+      <div class="t"><div class="mid"></div>
+        <div class="b" style="${pos?`left:50%;`:`right:50%;`}width:${w}%;background:${pos?C.turf:C.clay}"></div>
+        <div class="v" style="${pos?`left:calc(50% + ${w}% + 8px)`:`right:calc(50% + ${w}% + 8px)`}">${f.diff>0?'+':''}${f.diff}</div>
+      </div></div>`;
+  }).join('');
+
+  /* ---- backtest table ---- */
+  const B=d.backtest;
+  document.getElementById('bt').innerHTML =
+    `<thead><tr><th>Season</th><th>Goals</th><th>Shot quality</th><th>Blend</th><th>Bookmaker</th></tr></thead><tbody>`
+    + B.map(b=>{
+      const best=Math.min(b.goals,b.xg,b.blend);
+      const c=v=>`<td class="${v===best?'best':''}">${v.toFixed(4)}</td>`;
+      return `<tr><td>${b.season}</td>${c(b.goals)}${c(b.xg)}${c(b.blend)}<td style="color:${C.dim}">${b.market.toFixed(4)}</td></tr>`;
+    }).join('') + `</tbody>`;
+
+  /* ---- calibration ---- */
+  const K=d.calibration, cal=document.getElementById('cal');
+  const W=560,H=230,ML=44,MR=14,MT=16,MB=34;
+  cal.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const xs=v=>ML+(v-1)/(1.8-1)*(W-ML-MR), ys=v=>MT+(95-v)/(95-64)*(H-MT-MB);
+  [70,80,90].forEach(v=>{
+    cal.appendChild(el('line',{x1:ML,x2:W-MR,y1:ys(v),y2:ys(v),
+      stroke:v===80?C.flood:C.line,'stroke-dasharray':v===80?'4 3':'0','stroke-opacity':v===80?.65:1}));
+    const t=el('text',{x:ML-8,y:ys(v)+4,'text-anchor':'end'}); t.textContent=v+'%'; cal.appendChild(t);
+  });
+  cal.appendChild(el('path',{d:K.map((k,i)=>`${i?'L':'M'}${xs(k.widen)},${ys(k.coverage)}`).join(''),
+    fill:'none',stroke:C.chalk,'stroke-width':2}));
+  K.forEach(k=>{
+    const on=Math.abs(k.widen-d.meta.widen)<1e-6;
+    cal.appendChild(el('circle',{cx:xs(k.widen),cy:ys(k.coverage),r:on?5:3,
+      fill:on?C.flood:C.chalk}));
+    if(k.widen===1.0||on||k.widen===1.8){
+      const t=el('text',{x:xs(k.widen),y:H-14,'text-anchor':'middle'});
+      t.textContent=k.widen.toFixed(1); cal.appendChild(t);
+    }
+  });
+  const lbl=el('text',{x:xs(d.meta.widen)+10,y:ys(79.3)-10,fill:C.flood});
+  lbl.textContent='used here'; cal.appendChild(lbl);
+}
+</script>
+</body>
+</html>
