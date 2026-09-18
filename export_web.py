@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate web/data.json for the website.
+"""Generate docs/data.json for the website.
 
     python export_web.py
     python export_web.py --sims 30000 --bootstrap 60
 
 Everything the site shows is precomputed here, so the page is a static file
-reading JSON. No server, no API, nothing to keep running. Push web/ to GitHub
+reading JSON. No server, no API, nothing to keep running. Push docs/ to GitHub
 Pages and it works.
 """
 from __future__ import annotations
@@ -138,7 +138,7 @@ def main():
     with open(a.out, "w") as fh:
         json.dump(data, fh, separators=(",", ":"))
     print(f"\nwrote {a.out} ({os.path.getsize(a.out) / 1024:.0f} KB)")
-    print("Open web/index.html, or push web/ to GitHub Pages.")
+    print("Open docs/index.html, or push docs/ to GitHub Pages.")
 
 
 if __name__ == "__main__":
