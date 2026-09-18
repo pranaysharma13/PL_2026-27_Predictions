@@ -198,8 +198,8 @@ footer p+p{margin-top:.7rem}
 <div class="wrap">
 
   <header class="mast">
-    <h1>Twenty clubs.<span>Thirty-four matchweeks left.</span></h1>
-    <p class="serif sub">A statistical model reads seven seasons of results and shot quality, works out how good every club really is, then plays the rest of this season out twenty thousand times. Here is what it found, and here is what it gets wrong.</p>
+    <h1 id="hl">Twenty clubs.<span>Thirty-four matchweeks left.</span></h1>
+    <p class="serif sub" id="lede">A statistical model reads seven seasons of results and shot quality, works out how good every club really is, then plays the rest of this season out many thousands of times. Here is what it found, and here is what it gets wrong.</p>
     <div class="facts" id="facts"></div>
   </header>
 
@@ -436,7 +436,27 @@ fetch('data.json').then(r=>r.json()).then(build).catch(()=>{
     '<div class="banner">Could not load data.json. Run <b>python export_web.py</b> to generate it, then reload.</div>';
 });
 
+const WORDS=['zero','one','two','three','four','five','six','seven','eight','nine','ten',
+ 'eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen',
+ 'twenty','twenty-one','twenty-two','twenty-three','twenty-four','twenty-five','twenty-six',
+ 'twenty-seven','twenty-eight','twenty-nine','thirty','thirty-one','thirty-two','thirty-three',
+ 'thirty-four','thirty-five','thirty-six','thirty-seven','thirty-eight'];
+const cap=w=>w[0].toUpperCase()+w.slice(1);
+const spell=n=>WORDS[n]!==undefined?WORDS[n]:String(n);
+
 function build(d){
+  // The headline counts down with the season; spelling the number keeps the
+  // typographic weight that a digit would lose.
+  const left=38-d.matchweek;
+  document.querySelector('#hl span').textContent =
+    left<=0 ? 'Season complete.'
+    : left===1 ? 'One matchweek left.'
+    : `${cap(spell(left))} matchweeks left.`;
+  document.getElementById('lede').textContent =
+    `A statistical model reads seven seasons of results and shot quality, works out how good `
+    + `every club really is, then plays the rest of this season out ${spell(Math.round(d.meta.sims/1000))} `
+    + `thousand times. Here is what it found, and here is what it gets wrong.`;
+
   document.getElementById('stamp').textContent =
     `Season ${d.season}, after matchweek ${d.matchweek}. ${d.meta.sims.toLocaleString()} simulated seasons across ${d.meta.bootstrap} refits of the model, spread widened by ${d.meta.widen}. Generated ${d.generated}.`;
 
